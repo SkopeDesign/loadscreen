@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>sb-loadscreen player</title>
+    <style>html,body{margin:0;background:#000;overflow:hidden}</style>
+</head>
+<body>
+    <!-- Unsichtbarer YouTube-Player für sb-loadscreen.
+         Diese Datei auf GitHub Pages hochladen (nicht in den FiveM-Server). -->
+    <div id="p"></div>
+    <script>
+        let player = null, ready = false;
+        const queue = [];
+        function send(msg) { msg.sbyt = true; try { parent.postMessage(msg, '*'); } catch (e) {} }
+
+        function run(c) {
+            switch (c.sbcmd) {
+                case 'load':   player.loadVideoById(c.id); break;
+                case 'play':   player.playVideo(); break;
+                case 'pause':  player.pauseVideo(); break;
+                case 'volume': player.setVolume(c.v); break;
+                case 'mute':   player.mute(); break;
+                case 'unmute': player.unMute(); break;
+            }
+        }
+
+        window.addEventListener('message', (e) => {
+            const c = e.data;
+            if (!c || !c.sbcmd) return;
+            ready ? run(c) : queue.push(c);
+        });
+
+        window.onYouTubeIframeAPIReady = () => {
+            player = new YT.Player('p', {
+                width: 200, height: 200,
+                playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, rel: 0, iv_load_policy: 3, origin: location.origin },
+                events: {
+                    onReady: () => { ready = true; queue.splice(0).forEach(run); send({ type: 'ready' }); },
+                    onStateChange: (e) => {
+                        if (e.data === 1) send({ type: 'playing', title: (player.getVideoData() || {}).title });
+                        if (e.data === 2) send({ type: 'paused' });
+                        if (e.data === 0) send({ type: 'ended' });
+                    },
+                    onError: (e) => send({ type: 'error', code: e.data }),
+                },
+            });
+        };
+    </script>
+    <script src="https://www.youtube.com/iframe_api" onerror="send({type:'apifail'})"></script>
+</body>
+</html>
