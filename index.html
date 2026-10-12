@@ -12,6 +12,13 @@
     <div id="p"></div>
     <script>
         let player = null, ready = false;
+        // Testmodus: .../loadscreen/?test=VIDEO-ID  -> sichtbarer Player im Browser
+        const TEST = new URLSearchParams(location.search).get('test');
+        if (TEST) document.addEventListener('DOMContentLoaded', () => {
+            document.body.style.cssText = 'margin:20px;background:#111;color:#fff;font-family:sans-serif';
+            document.body.insertAdjacentHTML('afterbegin', '<h3>sb-loadscreen Proxy-Test</h3><p id=st>lade …</p>');
+        });
+        function status(t) { const el = document.getElementById('st'); if (el) el.textContent = t; }
         const queue = [];
         function send(msg) { msg.sbyt = true; try { parent.postMessage(msg, '*'); } catch (e) {} }
 
@@ -34,16 +41,19 @@
 
         window.onYouTubeIframeAPIReady = () => {
             player = new YT.Player('p', {
-                width: 200, height: 200,
-                playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, rel: 0, iv_load_policy: 3, origin: location.origin },
+                width: TEST ? 480 : 200, height: TEST ? 270 : 200,
+                videoId: TEST || undefined,
+                playerVars: { autoplay: 1, controls: TEST ? 1 : 0, disablekb: 1, playsinline: 1, rel: 0, iv_load_policy: 3,
+                              origin: location.origin, widget_referrer: location.href },
                 events: {
                     onReady: () => { ready = true; queue.splice(0).forEach(run); send({ type: 'ready' }); },
                     onStateChange: (e) => {
+                        if (e.data === 1) status('LÄUFT: ' + (player.getVideoData() || {}).title);
                         if (e.data === 1) send({ type: 'playing', title: (player.getVideoData() || {}).title });
                         if (e.data === 2) send({ type: 'paused' });
                         if (e.data === 0) send({ type: 'ended' });
                     },
-                    onError: (e) => send({ type: 'error', code: e.data }),
+                    onError: (e) => { status('FEHLER ' + e.data); send({ type: 'error', code: e.data }); },
                 },
             });
         };
